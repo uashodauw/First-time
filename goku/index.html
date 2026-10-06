@@ -257,6 +257,28 @@ body.typing #textRow{display:flex}
 #diag{margin-top:10px;font-size:12px;font-weight:600;color:#555;line-height:1.5;background:#f4f6f8;border-radius:10px;padding:6px 8px;word-break:break-all;user-select:text;-webkit-user-select:text}
 #panel button{flex:1;font-family:var(--ui-font);font-weight:900;font-size:15px;border:3px solid var(--ink);border-radius:12px;padding:6px;background:#ffe066;cursor:pointer}
 @media (max-width:640px){.rbtn{width:52px;height:52px;font-size:20px}.rbtn small{font-size:10px}.side{gap:10px}#panel{right:10px;left:10px;width:auto}}
+/* v3：声音和语言面板 */
+#panel .phead{display:flex;align-items:center;gap:8px;margin-bottom:2px}
+#panel .phead h3{flex:1;margin:0}
+#panel .phead button.mute{flex:none;font-size:12px;padding:3px 10px;border-width:2px;border-radius:999px;background:#d3f9d8}
+#panel .phead button.mute.off{background:#eee;color:#666}
+#panel h4.sec{margin:12px 0 6px;font-size:15px}
+#panel h4.sec small{font-size:12px;color:#777;font-weight:700;margin-left:4px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+#panel .chips button{flex:none;font-size:13px;padding:4px 11px;border-width:2px;border-radius:999px;background:#fff}
+#panel .chips button.on{background:#ffe066}
+#panel .chips button small{font-size:10px;color:#888;margin-left:3px}
+.offer{display:none;font-size:13px;font-weight:700;background:#e7f5ff;border:2px solid #74c0fc;border-radius:12px;padding:8px 10px;margin:0 0 8px;line-height:1.5}
+.offer.show{display:block}
+#panel .offer button{flex:none;display:inline-block;font-size:12px;padding:3px 10px;border-width:2px;border-radius:999px;margin:6px 6px 0 0}
+#panel .offer button.no{background:#fff}
+details.vfold{margin:2px 0}
+details.vfold>summary{cursor:pointer;list-style:none;font-size:14px;font-weight:900;margin:8px 0 4px;padding:3px 2px;border-radius:8px}
+details.vfold>summary::-webkit-details-marker{display:none}
+details.vfold>summary::before{content:'▸ ';color:#e8590c}
+details.vfold[open]>summary::before{content:'▾ '}
+details.vfold>summary small{font-size:12px;color:#888;font-weight:700;margin-left:4px}
+details.vfold.sub>summary{font-size:12px;color:#666;font-weight:800;margin:6px 0 2px}
 @media (max-height:700px){#voiceList{max-height:38vh}}
 /* 手机竖屏：功能按钮排成一行放在底部（不挡住悟空），适配刘海/底部横条 */
 @media (max-width:600px) and (orientation:portrait){
@@ -382,9 +404,13 @@ body.kb-open #stage{bottom:calc(var(--kb,0px) + 110px)}
 </div>
 
 <div id="panel">
-  <h3>悟空的声线 <small id="curVoiceLbl"></small></h3>
+  <div class="phead"><h3>声音和语言</h3><button type="button" id="muteToggle" class="mute">🔊 悟空出声：开</button></div>
+  <h4 class="sec">① 悟空说什么语言 <small>他会用这种语言回答，也用这种语言听你说话</small></h4>
+  <div class="chips" id="langRow"></div>
+  <h4 class="sec">② 悟空的声线 <small id="curVoiceLbl"></small></h4>
+  <div id="langOffer" class="offer"></div>
   <div id="voiceList"></div>
-  <div class="presets" id="presets"><span>快捷：</span><button type="button" data-p="0,0">默认</button><button type="button" data-p="6,3">活泼小男孩</button><button type="button" data-p="10,5">奶声奶气</button><button type="button" data-p="-7,-2">低沉大魔王</button><button type="button" data-p="0,-4">慢慢说</button></div>
+  <div class="presets" id="presets"><span>③ 快捷音色：</span><button type="button" data-p="0,0">默认</button><button type="button" data-p="6,3">小悟空活泼</button><button type="button" data-p="10,5">奶声奶气</button><button type="button" data-p="0,-4">慢慢说</button><button type="button" data-p="2,7">快嘴</button><button type="button" data-p="-7,-2">低沉大魔王</button></div>
   <div class="sliders">
     <label>音调 <span id="pitchV"></span><small>（往右更像小孩）</small></label><input type="range" id="pitchR" min="-10" max="10" step="1">
     <label>语速 <span id="rateV"></span></label><input type="range" id="rateR" min="-10" max="10" step="1">
@@ -591,17 +617,19 @@ let audioCtx, analyser, levelData;   // 共用的 AudioContext（自然声线播
  * app.pitchAdj / app.rateAdj：-10 ~ +10 的微调，两种声线通用 */
 const DEFAULT_VOICE_KEY = CONFIG.PUBLIC ? 'auto' : 'edge:yunxia';
 function loadSettings() {
+  app.lang = app.lang || 'zh';
   try {
     const s = JSON.parse(localStorage.getItem('goku_voice2') || '{}');
     if (typeof s.key === 'string') app.voiceKey = s.key;
     app.pitchAdj = +s.pitchAdj || 0; app.rateAdj = +s.rateAdj || 0;
+    if (typeof s.lang === 'string' && LANGS[s.lang]) app.lang = s.lang;
   } catch (e) {}
   if (!app.voiceKey) app.voiceKey = DEFAULT_VOICE_KEY;
   app.pitchAdj = Math.max(-10, Math.min(10, Math.round(app.pitchAdj || 0)));
   app.rateAdj = Math.max(-10, Math.min(10, Math.round(app.rateAdj || 0)));
   applyAdj();
 }
-function saveSettings() { try { localStorage.setItem('goku_voice2', JSON.stringify({ key: app.voiceKey, pitchAdj: app.pitchAdj, rateAdj: app.rateAdj })); } catch (e) {} }
+function saveSettings() { try { localStorage.setItem('goku_voice2', JSON.stringify({ key: app.voiceKey, pitchAdj: app.pitchAdj, rateAdj: app.rateAdj, lang: app.lang })); } catch (e) {} }
 function applyAdj() { // 系统声线用的音调/语速（基准：音调 1.3 显得更孩子气，语速 1.05）
   app.pitch = Math.max(0.5, Math.min(2, 1.3 + app.pitchAdj * 0.07));
   app.rate = Math.max(0.5, Math.min(1.6, 1.05 + app.rateAdj * 0.05));
@@ -639,33 +667,148 @@ function scoreVoice(v) {
 }
 function zhVoices() { return synth ? synth.getVoices().filter(v => scoreVoice(v) >= 0).sort((a, b) => scoreVoice(b) - scoreVoice(a)) : []; }
 function sysLabel(v) {
+  const g = speechGroup(v);
+  if (g !== 'zh' && g !== 'yue' && g !== 'tw') return [v.name.replace(/\s*\(.*\)\s*$/, '') || v.name, langDesc(v.lang) + (v.localService ? '' : '（在线）') + (FUN_VOICES.test(v.name) ? ' · 趣味音效' : '')];
   const n = (v.name || '').toLowerCase(), hit = SYS_LABELS.find(x => n.includes(x[0]));
   const extra = /premium|enhanced|高品质|增强/i.test(v.name) ? '·高品质' : /natural|neural/i.test(v.name) ? '·自然' : '';
   const where = v.localService ? '' : '（在线）';
   if (hit) return [hit[1] + extra, hit[2] + where];
   let m = n.match(/cmn-cn-x-([a-z]+)-(local|network)/);          // 安卓 Google 声音
   if (m) return ['安卓普通话 ' + m[1].toUpperCase(), '安卓系统声音' + (m[2] === 'local' ? '（本地）' : '（在线）')];
-  if (/google/.test(n)) return ['Google 普通话', 'Google 声音' + where];
+  if (/google/.test(n)) return [g === 'zh' ? 'Google 普通话' : v.name, 'Google 在线声音'];
+  if (g !== 'zh' && !hit) return [v.name.replace(/\s*\(.*\)\s*$/, '') || v.name, langDesc(v.lang) + where];
   return [v.name, (v.lang || '') + where];
 }
 
 const NEURAL = { ok: false, checked: true, base: '', voices: [], groups: [] };   // 公开版没有自然声线服务器
+/* ---------------- v3：回复语言 + 多语言声线 ---------------- */
+const LANGS = {"zh": {"name": "中文", "full": "中文（普通话）", "asr": "zh-CN", "tts": "zh-CN"}, "yue": {"name": "粤语", "full": "粤语（广东话）", "asr": "zh-HK", "tts": "zh-HK"}, "tw": {"name": "台湾国语", "full": "台湾国语（繁体）", "asr": "zh-TW", "tts": "zh-TW"}, "en": {"name": "English", "full": "英语 English", "asr": "en-US", "tts": "en-US"}, "ja": {"name": "日本語", "full": "日语 日本語", "asr": "ja-JP", "tts": "ja-JP"}, "ko": {"name": "한국어", "full": "韩语 한국어", "asr": "ko-KR", "tts": "ko-KR"}, "es": {"name": "Español", "full": "西班牙语 Español", "asr": "es-ES", "tts": "es-ES"}, "fr": {"name": "Français", "full": "法语 Français", "asr": "fr-FR", "tts": "fr-FR"}, "de": {"name": "Deutsch", "full": "德语 Deutsch", "asr": "de-DE", "tts": "de-DE"}};
+const LANG_RULES = {"zh": "", "yue": "\n\n【回复语言（最重要，优先于上面关于语言、字数和“不要英文”的规定）】\n从现在起只用地道的香港粤语口语回答，用繁体字写出粤语口语（例如“係”“唔”“佢”“咗”“嘅”“啦”“喎”），不要用普通话书面语。每次一到三句短句。人名和招式用你最熟悉的叫法，拿不准就用普通话版的叫法。对方说普通话或别的语言，你也照样用粤语回答。", "tw": "\n\n【回复语言（最重要，优先于上面关于语言、字数和“不要英文”的规定）】\n从现在起只用台湾国语回答，用繁体字书写，用台湾的说法和语气词（例如“喔”“耶”“超”“真的假的”）。每次一到三句短句，总共不超过四十五个字。对方用别的语言说话，你也照样用台湾国语回答。", "en": "\n\n【回复语言（最重要，优先于上面关于语言、字数和“不要英文”的规定）】\nFrom now on reply ONLY in simple, natural spoken English, like a cheerful 12-year-old boy. 1 to 3 short sentences, about 30 words at most. Use the English Dragon Ball names: Grandpa Gohan, Bulma, Master Roshi, Krillin, Oolong, Yamcha, Puar, Chi-Chi, Ox-King, Kamehameha, Flying Nimbus, Power Pole, Dragon Balls, Shenron, Korin, Red Ribbon Army, Mercenary Tao, Tien, Chiaotzu, King Piccolo. Never use Chinese characters. Even if the user speaks Chinese, answer in English.", "ja": "\n\n【回复语言（最重要，优先于上面关于语言、字数和“不要英文”的规定）】\n从现在起只用自然的日语口语回答，像日版动画里的小悟空：自称“オラ”，语气像“〜だぞ”“〜だな”“すっげえ”“へへっ”。每次一到三句短句。人名和招式用日版叫法：じっちゃん（孫悟飯）、ブルマ、亀仙人のじっちゃん、クリリン、ウーロン、ヤムチャ、プーアル、チチ、牛魔王、かめはめ波、筋斗雲、如意棒、ドラゴンボール、神龍、カリン様、レッドリボン軍、桃白白、天津飯、餃子、ピッコロ大魔王。不要夹杂中文。对方说中文，你也用日语回答。", "ko": "\n\n【回复语言（最重要，优先于上面关于语言、字数和“不要英文”的规定）】\n从现在起只用自然的韩语口语回答（반말，像十二岁的小男孩）。每次一到三句短句。人名和招式用韩版叫法：손오반 할아버지、부르마、거북선인、크리링、우롱、야무치、푸알、치치、우마왕、에네르기파、근두운、여의봉、드래곤볼、신룡、천진반、차오즈、피콜로 대마왕。不要夹杂中文。对方说中文，你也用韩语回答。", "es": "\n\n【回复语言（最重要，优先于上面关于语言、字数和“不要英文”的规定）】\nFrom now on reply ONLY in simple, natural spoken Spanish, like a cheerful 12-year-old boy. 1 to 3 short sentences. Use these Dragon Ball names: el abuelito Gohan, Bulma, el Maestro Roshi, Krilin, Oolong, Yamcha, Puar, Kamehameha, la Nube Voladora, las Bolas de Dragón, Shenlong. Never use Chinese characters. Even if the user speaks Chinese, answer in Spanish.", "fr": "\n\n【回复语言（最重要，优先于上面关于语言、字数和“不要英文”的规定）】\nFrom now on reply ONLY in simple, natural spoken French, like a cheerful 12-year-old boy (tutoie the user). 1 to 3 short sentences. Use the French Dragon Ball names: grand-père Gohan, Bulma, Tortue Géniale, Krilin, Oolong, Yamcha, Plume, Kaméhaméha, le Nuage Magique, les Boules de Cristal, Shenron, Satan Petit-Cœur. Never use Chinese characters. Even if the user speaks Chinese, answer in French.", "de": "\n\n【回复语言（最重要，优先于上面关于语言、字数和“不要英文”的规定）】\nFrom now on reply ONLY in simple, natural spoken German, like a cheerful 12-year-old boy (duze the user). 1 to 3 short sentences. Use these Dragon Ball names: Opa Gohan, Bulma, Muten Roshi, Krillin, Oolong, Yamchu, Kamehameha, Jindujun (die Wolke), die Dragonballs, Shenlong. Never use Chinese characters. Even if the user speaks Chinese, answer in German."};
+const LANG_LINES = {"yue": {"greet": ["嗨！我係孫悟空！今日想同我傾啲乜嘢呀？", "嘿嘿，你嚟啦！我係孫悟空，你今日過成點呀？"], "pat": ["嘿嘿，好痕呀！", "你摸緊我啲頭髮呀？佢好硬㗎！", "爺爺以前都成日摸我個頭㗎！"], "fly": ["筋斗雲～！嚟啦！呼呼，飛得好快呀！", "坐上筋斗雲，我哋一齊去兜風啦！"], "reset": "好呀，我哋重新開始傾啦！你今日過成點呀？", "sample": "嗨！我係孫悟空，我哋一齊去修行啦！", "err": "哎呀，我個腦卡住咗，等陣再問我好唔好？", "blank": "嘿嘿，我啱啱發咗陣呆，你再講一次好唔好？"}, "tw": {"greet": ["嗨！我是孫悟空！今天想跟我聊什麼呀？", "嘿嘿，你來啦！我是孫悟空，你今天過得怎麼樣？"], "pat": ["嘿嘿，好癢喔！", "你在摸我的頭髮嗎？它超硬的，翹得到處都是！", "爺爺以前也常常摸我的頭呢！"], "fly": ["筋斗雲～！來啦！呼呼，飛得好快喔！", "坐上筋斗雲，我們一起去兜風吧！"], "reset": "好呀，我們重新開始聊吧！你今天過得怎麼樣？", "sample": "嗨！我是孫悟空，我們一起去修行吧！", "err": "哎呀，我的腦袋卡住了，等一下再問我好不好？", "blank": "嘿嘿，我剛剛恍神了，你再說一次好不好？"}, "en": {"greet": ["Hi! I'm Son Goku! What do you wanna talk about today?", "Hey, you came! I'm Goku. How's your day going?", "Wow, someone came to play! I'm Goku. What's your name?"], "pat": ["Hehe, that tickles!", "Are you touching my hair? It's super spiky!", "Grandpa used to pat my head too!"], "fly": ["Flying Nimbus! Whoosh, we're flying so fast!", "Hop on the Nimbus, let's go for a ride!"], "reset": "Okay, let's start over! How's your day going?", "sample": "Hi! I'm Son Goku! Let's go train together!", "err": "Oops, my head got stuck! Can you ask me again in a bit?", "blank": "Hehe, I spaced out. Can you say that again?"}, "ja": {"greet": ["やあ！オラ悟空！今日は何の話をする？", "へへっ、来てくれたんだな！オラ悟空、今日はどうだった？"], "pat": ["へへっ、くすぐってえよ！", "オラの髪さわってんのか？すっげえかてえだろ！", "じっちゃんもよくオラの頭なでてくれたんだ！"], "fly": ["きんとうーん！ひゃっほー、はええぞ！", "筋斗雲に乗って、一緒にとびまわろうぜ！"], "reset": "よし、最初から話そうぜ！今日はどうだった？", "sample": "オッス！オラ悟空！一緒に修行しようぜ！", "err": "あれ？頭がこんがらがっちまった。もう一回聞いてくれよ！", "blank": "へへっ、ぼーっとしてた。もう一回言ってくれ！"}, "ko": {"greet": ["안녕! 나는 손오공이야! 오늘 무슨 얘기 할래?", "헤헤, 왔구나! 나는 손오공이야. 오늘 어땠어?"], "pat": ["헤헤, 간지러워!", "내 머리 만지는 거야? 엄청 뻣뻣하지!", "할아버지도 내 머리 자주 쓰다듬어 줬어!"], "fly": ["근두운! 이리 와! 우와, 엄청 빠르다!", "근두운 타고 같이 날아다니자!"], "reset": "좋아, 처음부터 다시 얘기하자! 오늘 어땠어?", "sample": "안녕! 나는 손오공이야. 같이 수련하자!", "err": "어라, 머리가 멈춰 버렸어. 조금 있다가 다시 물어봐 줄래?", "blank": "헤헤, 잠깐 멍때렸어. 다시 말해 줄래?"}, "es": {"greet": ["¡Hola! ¡Soy Son Goku! ¿De qué quieres hablar hoy?", "¡Hola, viniste! Soy Goku. ¿Qué tal tu día?"], "pat": ["¡Jeje, me haces cosquillas!", "¿Me tocas el pelo? ¡Es muy puntiagudo!", "¡El abuelito también me acariciaba la cabeza!"], "fly": ["¡Nube Voladora! ¡Qué rápido volamos!", "¡Súbete a la Nube Voladora y demos una vuelta!"], "reset": "¡Vale, empecemos de nuevo! ¿Qué tal tu día?", "sample": "¡Hola! ¡Soy Son Goku! ¡Vamos a entrenar juntos!", "err": "¡Ay, se me trabó la cabeza! ¿Me lo preguntas otra vez en un rato?", "blank": "Jeje, me distraje. ¿Me lo dices otra vez?"}, "fr": {"greet": ["Salut ! Je suis Son Goku ! De quoi tu veux parler aujourd'hui ?", "Hé, te voilà ! Je suis Goku. Ta journée, ça va ?"], "pat": ["Héhé, ça chatouille !", "Tu touches mes cheveux ? Ils sont super pointus !", "Grand-père me caressait souvent la tête aussi !"], "fly": ["Nuage Magique ! Waouh, on vole trop vite !", "Monte sur le Nuage Magique, on va faire un tour !"], "reset": "D'accord, on recommence ! Ta journée, ça va ?", "sample": "Salut ! Je suis Son Goku ! On va s'entraîner ensemble ?", "err": "Oups, ma tête s'est bloquée ! Tu me redemandes dans un moment ?", "blank": "Héhé, j'étais dans la lune. Tu peux répéter ?"}, "de": {"greet": ["Hallo! Ich bin Son Goku! Worüber willst du heute reden?", "Hey, da bist du ja! Ich bin Goku. Wie war dein Tag?"], "pat": ["Hehe, das kitzelt!", "Fasst du meine Haare an? Die sind total stachelig!", "Opa hat mir auch oft über den Kopf gestreichelt!"], "fly": ["Jindujun! Wow, wir fliegen so schnell!", "Steig auf die Wolke, wir machen einen Ausflug!"], "reset": "Okay, wir fangen von vorne an! Wie war dein Tag?", "sample": "Hallo! Ich bin Son Goku! Lass uns zusammen trainieren!", "err": "Hoppla, mein Kopf hängt! Fragst du mich gleich nochmal?", "blank": "Hehe, ich hab geträumt. Sagst du das nochmal?"}};
+const EXTRA_SAMPLES = {"it": "Ciao! Sono Son Goku! Alleniamoci insieme!", "pt": "Olá! Eu sou o Son Goku! Vamos treinar juntos!", "ru": "Привет! Я Сон Гоку! Давай тренироваться вместе!", "nl": "Hoi! Ik ben Son Goku! Zullen we samen trainen?", "th": "สวัสดี! ฉันคือซุนโกคู มาฝึกด้วยกันเถอะ!", "vi": "Xin chào! Mình là Son Goku! Cùng luyện tập nhé!", "id": "Halo! Aku Son Goku! Ayo berlatih bersama!", "pl": "Cześć! Jestem Son Goku! Trenujmy razem!", "tr": "Merhaba! Ben Son Goku! Hadi birlikte antrenman yapalım!", "sv": "Hej! Jag är Son Goku! Ska vi träna tillsammans?", "ar": "مرحبا! أنا سون غوكو! هيا نتدرب معا!", "hi": "नमस्ते! मैं सोन गोकू हूँ! चलो साथ में अभ्यास करें!"};
+const EDGE_PREF = {"zh": "yunxia", "yue": "wanlung_kid", "tw": "yunjhe", "en": "en_ana", "ja": "ja_keita_kid", "ko": "ko_injoon_kid", "es": "es_alvaro", "fr": "fr_eloise", "de": "de_killian"};
+function L(k, lang) {   // 当前语言的固定台词（中文用原来的台词）
+  const d = LANG_LINES[lang || app.lang];
+  if (d && d[k] != null) return d[k];
+  return { greet: GREET_LINES, pat: PAT_LINES, fly: FLY_LINES, reset: '好呀，我们重新开始聊吧！你今天过得怎么样？', sample: SAMPLE_LINE,
+    err: '哎呀，我的脑袋卡住了，等一下再问我好不好？', blank: '嘿嘿，我刚刚走神了，你再说一遍好不好？' }[k];
+}
+function asrLang() { const c = LANGS[app.lang] || LANGS.zh; return app.lang === 'yue' && !isSafari() ? 'yue-Hant-HK' : c.asr; }
+function ttsLang() { return (LANGS[app.lang] || LANGS.zh).tts; }
+function langRule() { return LANG_RULES[app.lang] || ''; }
+// 声音属于哪一类语言：'zh' 普通话 / 'yue' 粤语 / 'tw' 台湾国语 / 其他用语言代码（en、ja…）
+function langGroupOf(code, name) {
+  const l = String(code || '').toLowerCase().replace(/_/g, '-'), n = String(name || '').toLowerCase();
+  if (/^(yue|zh-hk|zh-mo|zh-yue)/.test(l) || (/^(zh|cmn)/.test(l) && /粤|粵|cantonese|hong kong/.test(n))) return 'yue';
+  if (/^(zh|cmn)/.test(l)) return (/tw|hant/.test(l) || /台湾|臺灣|taiwan/.test(n)) ? 'tw' : 'zh';
+  return l.split('-')[0] || 'other';
+}
+const FUN_VOICES = /^(albert|bad news|bahh|bells|boing|bubbles|cellos|good news|jester|organ|pipe organ|superstar|trinoids|whisper|wobble|zarvox|deranged|hysterical)\b/i;
+function sysGroup(v) { return FUN_VOICES.test(v.name) ? 'fun' : langGroupOf(v.lang, v.name + ' ' + v.voiceURI); }
+function speechGroup(v) { return langGroupOf(v.lang, v.name + ' ' + v.voiceURI); }   // 趣味声音也算英语
+function langForGroup(g) { return LANGS[g] ? g : null; }
+const ELOQ = /^(eddy|flo|grandma|grandpa|reed|rocko|sandy|shelley)\b/i;
+function scoreAny(v) {
+  const g = speechGroup(v);
+  if (g === 'zh') { const s = scoreVoice(v); if (s >= 0) return s; }
+  const n = (v.name + ' ' + v.voiceURI).toLowerCase();
+  let s = 100;
+  if (v.localService) s += 60; else s -= 40;
+  if (/google/.test(n)) s -= 20;
+  if (/natural|neural/.test(n)) s += 100;
+  if (/premium|enhanced|高品质|增强/.test(n)) s += 8;
+  if (ELOQ.test(v.name)) s -= 10;
+  if (FUN_VOICES.test(v.name)) s -= 500;
+  const want = LANGS[g] && LANGS[g].tts.toLowerCase();
+  if (want && voiceLang(v) === want) s += 5;
+  return s;
+}
+function allVoices() {
+  if (!synth) return [];
+  const seen = new Set();
+  return synth.getVoices().filter(v => v && v.name && !seen.has(v.name) && seen.add(v.name)).sort((a, b) => scoreAny(b) - scoreAny(a));
+}
+function bestSysVoice(lang) {
+  lang = lang || app.lang;
+  if (lang === 'zh') return zhVoices()[0] || null;
+  return allVoices().find(v => speechGroup(v) === lang && !FUN_VOICES.test(v.name)) || null;
+}
+function edgeLang(v) { return v.lang || (v.voice ? v.voice.split('-').slice(0, 2).join('-') : 'zh-CN'); }
+function bestEdgeVoice(lang) {
+  if (!NEURAL.ok) return null;
+  const vs = NEURAL.voices.filter(v => langGroupOf(edgeLang(v), v.voice) === lang);
+  return vs.find(v => v.id === EDGE_PREF[lang]) || vs[0] || null;
+}
+const GROUP_NAMES = { zh: '中文普通话', yue: '粤语（广东话）', tw: '台湾国语', en: 'English 英语', ja: '日本語 日语', ko: '한국어 韩语', fun: '趣味音效声音（英语）' };
+function groupName(g) {
+  if (GROUP_NAMES[g]) return GROUP_NAMES[g];
+  try { const zh = new Intl.DisplayNames(['zh-CN'], { type: 'language' }).of(g), own = new Intl.DisplayNames([g], { type: 'language' }).of(g); return zh + (own && own !== zh ? ' ' + own : ''); } catch (e) { return g; }
+}
+function langDesc(code) { try { return new Intl.DisplayNames(['zh-CN'], { type: 'language' }).of(code); } catch (e) { return code; } }
+function sampleForGroup(g) { const l = langForGroup(g); return l ? L('sample', l) : (EXTRA_SAMPLES[g] || L('sample', 'en')); }
+function avGroup(av) { return av.engine === 'edge' ? langGroupOf(av.lang, av.id) : (av.voice ? speechGroup(av.voice) : langGroupOf(av.lang)); }
+function renderLangRow() {
+  const row = $('langRow'); if (!row) return;
+  row.innerHTML = '';
+  Object.keys(LANGS).forEach(k => {
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = LANGS[k].name;
+    if (k === 'yue' || k === 'tw') { const s = document.createElement('small'); s.textContent = k === 'tw' ? '繁体' : '广东话'; b.appendChild(s); }
+    b.className = k === app.lang ? 'on' : ''; b.onclick = () => setLang(k, true); row.appendChild(b);
+  });
+}
+function hideOffer() { const o = $('langOffer'); if (o) { o.classList.remove('show'); o.innerHTML = ''; } }
+function offerLangFor(av) {   // 选的声音和回复语言不一样：问要不要让悟空改用这种语言
+  const o = $('langOffer'); if (!o) return;
+  const g = avGroup(av), want = langForGroup(g);
+  if (!g || g === app.lang) { hideOffer(); return; }
+  o.innerHTML = '';
+  const t = document.createElement('div');
+  if (want) {
+    t.innerHTML = '这个声音说的是 <b>' + LANGS[want].full + '</b>，现在悟空用 <b>' + LANGS[app.lang].full + '</b> 回答。要让悟空也改用 ' + LANGS[want].name + ' 回答吗？';
+    o.appendChild(t);
+    const y = document.createElement('button'); y.type = 'button'; y.textContent = '好，用 ' + LANGS[want].name + ' 回答'; y.onclick = () => setLang(want, false);
+    const n = document.createElement('button'); n.type = 'button'; n.className = 'no'; n.textContent = '不用，继续说' + LANGS[app.lang].name; n.onclick = hideOffer;
+    o.appendChild(y); o.appendChild(n);
+  } else {
+    t.innerHTML = '这个声音是 <b>' + groupName(g) + '</b> 的，用它读' + LANGS[app.lang].name + '可能会怪怪的。悟空能用这些语言回答：' + Object.keys(LANGS).map(k => LANGS[k].name).join('、') + '。';
+    o.appendChild(t);
+    const n = document.createElement('button'); n.type = 'button'; n.className = 'no'; n.textContent = '知道了'; n.onclick = hideOffer; o.appendChild(n);
+  }
+  o.classList.add('show');
+}
+function setLang(k, fromRow) {
+  if (!LANGS[k]) return;
+  const changed = k !== app.lang;
+  app.lang = k; hideOffer();
+  if (app.recog) { try { app.recog.lang = asrLang(); if (app.recogRunning) app.recog.abort(); } catch (e) {} }   // 识别会自动重启，换成新语言
+  // 当前声音不是这种语言：自动换成这种语言里最合适的声音（本地版优先自然声线）
+  const av = activeVoice();
+  if (avGroup(av) !== k) {
+    const ev = bestEdgeVoice(k), sv = bestSysVoice(k);
+    if (ev) app.voiceKey = 'edge:' + ev.id;
+    else if (sv) app.voiceKey = 'sys:' + sv.name;
+    else { app.voiceKey = 'auto'; toast('这台设备上没有找到 <b>' + LANGS[k].full + '</b> 的声音，悟空会用系统默认声音读（可能不太标准）。<br>Mac/iPhone：设置 → 辅助功能 → 朗读内容 → 声音 里可以下载；Windows：设置 → 时间和语言 → 语音。', 8000); }
+  }
+  app.voice = activeVoice().voice; saveSettings();
+  renderLangRow(); renderVoiceList(); updateDiag(); updateStatus();
+  if (changed && fromRow !== null) sayTest(L('sample'));
+}
+
 /* 当前实际使用的声线：选了自然声线但服务器不可用时，自动改用最合适的系统声线（不改动保存的选择） */
 function activeVoice(key) {
   key = key || app.voiceKey || DEFAULT_VOICE_KEY;
   if (key.startsWith('edge:')) {
     const id = key.slice(5), v = NEURAL.ok && NEURAL.voices.find(x => x.id === id);
-    if (v) return { engine: 'edge', key, id, label: v.label, voice: null };
+    if (v) return { engine: 'edge', key, id, label: v.label, voice: null, lang: edgeLang(v) };
     key = 'auto';
   }
-  const vs = zhVoices();
-  let v = null, label;
+  let v = null;
   if (key.startsWith('sys:')) {
     const name = key.slice(4);
-    v = name ? (vs.find(x => x.name === name) || vs[0] || null) : null;
-  } else v = vs[0] || null;
-  label = v ? sysLabel(v)[0] : '系统默认中文声音';
-  return { engine: 'sys', key: v ? 'sys:' + v.name : 'sys:', voice: v, label };
+    v = name ? (allVoices().find(x => x.name === name) || bestSysVoice()) : null;
+  } else v = bestSysVoice();
+  const label = v ? sysLabel(v)[0] : '系统默认声音（' + LANGS[app.lang].name + '）';
+  return { engine: 'sys', key: v ? 'sys:' + v.name : 'sys:', voice: v, label, lang: v ? v.lang : ttsLang() };
 }
 function pickVoice() { // 兼容旧接口：刷新系统声音列表
   const av = activeVoice(); app.voice = av.voice;
@@ -697,29 +840,48 @@ function renderVoiceList() {
     return c;
   };
 
-  // Mac 系统声线
+  // 系统声音（所有语言，按语言分组；中文和当前语言默认展开）
   const g2 = el('div', 'vgroup');
-  g2.appendChild(el('h4', '', CONFIG.PUBLIC ? '本机中文声音' : 'Mac 系统声线'));
-  const vs = zhVoices();
+  g2.appendChild(el('h4', '', CONFIG.PUBLIC ? '这台设备上的声音' : 'Mac 系统声线（所有语言）'));
+  const all = allVoices();
   if (!synth) g2.appendChild(el('div', 'hint', '这个浏览器不支持系统朗读。'));
-  else if (!vs.length) g2.appendChild(el('div', 'hint', '没有找到中文（普通话）系统声音。Mac/iPhone：设置 → 辅助功能 → 朗读内容 → 声音 → 中文 里下载 Tingting 等；Windows：设置 → 时间和语言 → 语音 里添加中文语音；安卓：设置 → 文字转语音 里安装中文语音数据。也可能是声音列表还没加载完，稍等再打开设置看看。'));
-  vs.forEach(v => { const l = sysLabel(v); g2.appendChild(card('sys:' + v.name, l[0], l[1], true)); });
-  if (synth) g2.appendChild(card('sys:', '系统默认中文声音', '让系统自己挑一个 zh-CN 声音（备用）', true));
+  else if (!all.length) g2.appendChild(el('div', 'hint', '还没有读到这台设备的声音列表（有的浏览器要等一两秒），请稍后再打开设置看看。Mac/iPhone：设置 → 辅助功能 → 朗读内容 → 声音 里可以下载更多声音；Windows：设置 → 时间和语言 → 语音；安卓：设置 → 文字转语音。'));
+  const sgroups = {};
+  all.forEach(v => { const g = v.lang || v.name ? sysGroup(v) : 'other'; (sgroups[g] = sgroups[g] || []).push(v); });
+  if (sgroups.zh) sgroups.zh = zhVoices().concat(sgroups.zh.filter(v => scoreVoice(v) < 0));
+  const order = Object.keys(sgroups).sort((a, b) => {
+    const rank = g => g === 'zh' ? 0 : g === 'yue' ? 1 : g === 'tw' ? 2 : g === app.lang ? 3 : g === 'en' ? 4 : g === 'ja' ? 5 : g === 'ko' ? 6 : LANGS[g] ? 7 : g === 'fun' ? 99 : 8;
+    return rank(a) - rank(b) || sgroups[b].length - sgroups[a].length || a.localeCompare(b);
+  });
+  if (synth && all.length && !sgroups.zh) g2.appendChild(el('div', 'hint', '这台设备没有中文（普通话）声音。Mac/iPhone：设置 → 辅助功能 → 朗读内容 → 声音 → 中文 里下载 Tingting 等；Windows：设置 → 时间和语言 → 语音 里添加中文语音；安卓：设置 → 文字转语音 里安装中文语音数据。'));
+  app.openGroups = app.openGroups || {};
+  order.forEach(g => {
+    const d = el('details', 'vfold'); d.dataset.g = g;
+    const open = app.openGroups[g] != null ? app.openGroups[g] : (g === 'zh' || g === app.lang || sgroups[g].some(v => cur.key === 'sys:' + v.name));
+    if (open) d.open = true;
+    const sm = el('summary', '', groupName(g)); sm.appendChild(el('small', '', sgroups[g].length + ' 个')); d.appendChild(sm);
+    d.addEventListener('toggle', () => { app.openGroups[g] = d.open; });
+    sgroups[g].forEach(v => { const l = sysLabel(v); d.appendChild(card('sys:' + v.name, l[0], l[1], true)); });
+    g2.appendChild(d);
+  });
+  if (synth) g2.appendChild(card('sys:', '系统默认声音（' + LANGS[app.lang].name + '）', '让系统自己挑一个' + LANGS[app.lang].name + '声音（备用）', true));
   box.appendChild(g2);
   $('curVoiceLbl').textContent = '当前：' + cur.label;
+  renderLangRow();
 }
 function chooseVoice(key) {
   app.voiceKey = key; app.brokenVoice = null; saveSettings();
   app.voice = activeVoice().voice;
   renderVoiceList(); updateDiag();
   previewVoice(key);
+  offerLangFor(activeVoice(key));
 }
 let previewToken = 0;
-function previewVoice(key) { sayTest(SAMPLE_LINE, key); }
+function previewVoice(key) { sayTest(sampleForGroup(avGroup(activeVoice(key))), key); }
 /* 试听/测试：在点击事件里直接开始（同步解锁声音），并显示用了哪个声音 */
 function sayTest(text, key) {
   unlockTTS();
-  if (!app.ttsOn) $('btnMute').click();
+  if (!app.ttsOn) setTTS(true);
   if (app.busy && !app.previewing) { toast('悟空正在忙，等他说完再试听哦～', 2500); return; }
   if (app.previewing) stopSpeaking();
   app.busy = true; app.previewing = true; stopRecognition();
@@ -746,7 +908,7 @@ function updateDiag() {
   const av = activeVoice(), v = av.voice;
   const vs = av.engine === 'edge' ? av.label + '（自然声线）' : (v ? av.label + '（' + v.lang + (v.localService ? '，本地' : '，在线') + '）' : '系统默认中文声音');
   const ac = typeof audioCtx !== 'undefined' && audioCtx ? audioCtx.state : '未创建';
-  d.textContent = `浏览器：${browserName()} ｜ ${CONFIG.PUBLIC ? '' : '本地服务器：' + (NEURAL.ok ? '已连接（' + NEURAL.base.replace(/^https?:\/\//, '') + '）' : (NEURAL.checked ? '未连接' : '检测中')) + ' ｜ '}当前声音：${vs} ｜ 系统中文声音：${zhVoices().length} 个 ｜ ` +
+  d.textContent = `浏览器：${browserName()} ｜ ${CONFIG.PUBLIC ? '' : '本地服务器：' + (NEURAL.ok ? '已连接（' + NEURAL.base.replace(/^https?:\/\//, '') + '）' : (NEURAL.checked ? '未连接' : '检测中')) + ' ｜ '}当前声音：${vs} ｜ 回复语言：${LANGS[app.lang].name} ｜ 系统声音：${allVoices().length} 个（普通话 ${zhVoices().length} 个） ｜ ` +
     (synth ? `系统朗读：${synth.speaking ? '正在说' : '空闲'}${synth.pending ? '，排队中' : ''}${synth.paused ? '，已暂停' : ''}` : '不支持系统朗读') +
     ` ｜ 音频：${ac} ｜ 声音开关：${app.ttsOn ? '开' : '关'} ｜ 最近一次：${ttsDiag.last}`;
 }
@@ -781,7 +943,7 @@ function speakOnce(text, voice, hooks, startTimeout) {
     let u;
     try {
       u = new SpeechSynthesisUtterance(text);
-      u.lang = CONFIG.LANG;
+      u.lang = (voice && voice.lang) || hooks.lang || ttsLang();
       if (voice) { try { u.voice = voice; } catch (e) {} }
       u.pitch = app.pitch; u.rate = app.rate; u.volume = 1;
     } catch (e) { finish('error:' + e.message); return; }
@@ -812,7 +974,7 @@ async function speak(text, opts = {}) {
   // 自然声线连续失败 2 次：接下来 1 分钟直接用系统声线（避免每句都等超时）；试听时仍然会尝试
   if (av.engine === 'edge' && !opts.voiceKey && Date.now() < (app.neuralSkipUntil || 0)) av = activeVoice('auto');
   if (!app.ttsOn || (!synth && av.engine !== 'edge')) {           // 静音模式：只显示字幕
-    updateStatus(app.ttsOn ? '这个浏览器不支持朗读，请看字幕' : '声音已关闭（点右侧“声音”按钮打开）');
+    updateStatus(app.ttsOn ? '这个浏览器不支持朗读，请看字幕' : '声音已关闭（点右侧“声音”，在最上面打开）');
     startMouth(); await sleep(readMs); if (my === speakSeq) stopMouth(); return false;
   }
 
@@ -828,17 +990,17 @@ async function speakSystem(text, opts, av, my) {
   if (synth.speaking || synth.pending) { synth.cancel(); if (!sync) await sleep(150); }
   if (!sync && (micWasOn || !opts.now)) await sleep(CONFIG.MIC_RELEASE_MS);
   if (my !== speakSeq) return true;
-  const hooks = { onstart: () => { if (my === speakSeq) { startMouth(); updateStatus(); } }, onboundary: () => { mouthKick = 1; } };
+  const hooks = { lang: av.lang || ttsLang(), onstart: () => { if (my === speakSeq) { startMouth(); updateStatus(); } }, onboundary: () => { mouthKick = 1; } };
   const v = currentVoice(av);
   let r = await speakOnce(text, v, hooks, sync ? 2500 : 1500);
-  let used = v ? sysLabel(v)[0] : '系统默认(zh-CN)';
+  let used = v ? sysLabel(v)[0] : '系统默认(' + hooks.lang + ')';
   if (my === speakSeq && (r === 'nostart' || (r.startsWith('error:') && v))) {
-    console.warn('TTS 没有开始播放（' + r + '），改用系统默认中文声音重试');
+    console.warn('TTS 没有开始播放（' + r + '），改用系统默认声音重试');
     try { synth.cancel(); } catch (e) {}
     await sleep(200);
     r = await speakOnce(text, null, hooks, 2000);
-    used = '系统默认(zh-CN)';
-    if (r === 'ok' && v) { app.brokenVoice = v.name; toast('声音“' + v.name + '”在这个浏览器里放不出来，已自动改用系统默认中文声音。', 5000); }
+    used = '系统默认(' + hooks.lang + ')';
+    if (r === 'ok' && v) { app.brokenVoice = v.name; toast('声音“' + v.name + '”在这个浏览器里放不出来，已自动改用系统默认声音。', 5000); }
   }
   if (my === speakSeq) { stopMouth(); setMouth('grin'); }
   ttsDiag.last = { ok: '已正常播放', nostart: '没有开始播放', 'not-allowed': '被浏览器拦截（需要先点一下页面）', interrupted: '被打断' }[r] || r;
@@ -872,7 +1034,7 @@ function initRecognition() {
     updateStatus(); return null;
   }
   const r = new SR();
-  r.lang = CONFIG.LANG; r.continuous = true; r.interimResults = true; r.maxAlternatives = 1;
+  r.lang = asrLang(); r.continuous = true; r.interimResults = true; r.maxAlternatives = 1;
   r.onstart = () => { app.recogRunning = true; app.micOn = true; document.body.classList.add('mic-on'); updateStatus(); };
   r.onresult = (ev) => {
     if (app.state === 'thinking' || app.state === 'talking') return;
@@ -915,7 +1077,7 @@ function initRecognition() {
       app.micWanted = false; enableTyping();
       toast('没有找到可用的麦克风，请检查麦克风是否连接/被其他程序占用，然后点麦克风按钮重试；也可以先打字聊天。');
     } else if (e.error === 'language-not-supported') {
-      toast('当前浏览器不支持中文语音识别，请换 Safari 试试，或打字聊天。'); enableTyping();
+      app.micWanted = false; toast('当前浏览器听不懂“' + LANGS[app.lang].full + '”的语音，请点“打字”和悟空聊天，或者在“声音”里把语言换回中文。', 8000); enableTyping();
     }
   };
   r.onend = () => {
@@ -986,7 +1148,7 @@ async function askDeepSeek(userText) {
   app.history = app.history.slice(-CONFIG.MAX_TURNS * 2);
   const body = {
     model: CONFIG.MODEL,
-    messages: [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'system', content: chatContext() }, ...app.history],
+    messages: [{ role: 'system', content: SYSTEM_PROMPT + langRule() }, { role: 'system', content: chatContext() }, ...app.history],
     temperature: CONFIG.TEMPERATURE, max_tokens: CONFIG.MAX_TOKENS, stream: false,
     presence_penalty: 0.5, frequency_penalty: 0.3          // 少重复同样的词和话题
   };
@@ -1016,20 +1178,20 @@ async function askDeepSeek(userText) {
   let reply = (choice.message && choice.message.content || '').trim();
   reply = cleanForSpeech(reply);
   if (choice.finish_reason === 'length') reply = trimToSentence(reply);   // 万一太长被截断：只保留完整的句子
-  reply = reply || '嘿嘿，我刚刚走神了，你再说一遍好不好？';
+  reply = reply || L('blank');
   app.history.push({ role: 'assistant', content: reply });
   return reply;
 }
 window.askDeepSeek = askDeepSeek; // 调试用
 function trimToSentence(t) {
-  const m = t.match(/^[\s\S]*[。！？!?～~]/); return m ? m[0] : t;
+  const m = t.match(/^[\s\S]*[。！？!?～~.]/); return m ? m[0] : t;
 }
 function chatContext() {   // 给悟空一点“现场感”：现在几点、聊了多久，方便他自然地接话
   const d = new Date(), h = d.getHours();
   const part = h < 5 ? '深夜' : h < 9 ? '早上' : h < 12 ? '上午' : h < 14 ? '中午' : h < 18 ? '下午' : h < 22 ? '晚上' : '深夜';
   const turns = app.history.filter(m => m.role === 'user').length;
   return '（现场提示，不要念出来）现在是对方那里的' + part + '，你们已经聊了' + turns + '句。' +
-    (turns <= 1 ? '这是刚开始聊天。' : '接着前面的话题聊，别重复自己说过的话和问过的问题。') + '回复要短，一到三句。';
+    (turns <= 1 ? '这是刚开始聊天。' : '接着前面的话题聊，别重复自己说过的话和问过的问题。') + '回复要短，一到三句。' + (app.lang !== 'zh' ? '这一句必须用' + LANGS[app.lang].full + '回答。' : '');
 }
 
 function afterBusy(delay) { // 一段说话结束后：处理排队的文字，或者继续听
@@ -1053,6 +1215,7 @@ async function handleUserText(text) {
     else if (e.status === 429) msg = '一下子问太多啦，让我喘口气再聊吧！';
     else if (e.name === 'AbortError' || e instanceof TypeError) msg = '网络好像不太好，我没听清楚，再说一次好不好？';
     toast('AI 请求失败：' + (e.message || e), 6000);
+    if (app.lang !== 'zh') msg = L('err');   // 外语声音念中文会很怪：用这种语言说一句
     reply = msg;
   }
   await speak(reply);
@@ -1156,18 +1319,26 @@ async function quickLine(lines, cls) {
   app.busy = false; setState('idle'); scheduleHideBubble(2500);
   afterBusy(400);
 }
-$('flyer').addEventListener('click', () => { if (app.started) quickLine(PAT_LINES, 'jump'); });
-$('btnPat').onclick = () => quickLine(PAT_LINES, 'jump');
-$('btnFly').onclick = () => quickLine(FLY_LINES, 'fly');
-$('btnReset').onclick = () => { app.history = []; quickLine(['好呀，我们重新开始聊吧！你今天过得怎么样？'], 'jump'); };
+$('flyer').addEventListener('click', () => { if (app.started) quickLine(L('pat'), 'jump'); });
+$('btnPat').onclick = () => quickLine(L('pat'), 'jump');
+$('btnFly').onclick = () => quickLine(L('fly'), 'fly');
+$('btnReset').onclick = () => { app.history = []; quickLine([L('reset')], 'jump'); };
 function enableTyping() { document.body.classList.add('typing'); }
 $('btnType').onclick = () => { document.body.classList.toggle('typing'); if (document.body.classList.contains('typing')) $('textInput').focus(); };
-$('btnMute').onclick = () => {
-  app.ttsOn = !app.ttsOn; updateDiag(); $('btnMute').classList.toggle('off', !app.ttsOn);
-  $('btnMute').querySelector('span').textContent = app.ttsOn ? '🔊' : '🔇';
-  if (!app.ttsOn) stopSpeaking();
-};
-$('btnSet').onclick = () => { const show = !$('panel').classList.contains('show'); $('panel').classList.toggle('show', show); if (show) { pickVoice(); refreshKeyBox();  } };
+function setTTS(on) {   // 悟空出声 / 静音（只看字幕）
+  app.ttsOn = on; updateDiag(); $('btnMute').classList.toggle('off', !on);
+  $('btnMute').querySelector('span').textContent = on ? '🔊' : '🔇';
+  const m = $('muteToggle'); if (m) { m.textContent = on ? '🔊 悟空出声：开' : '🔇 已静音（点这里打开）'; m.classList.toggle('off', !on); }
+  if (!on) stopSpeaking();
+}
+function openPanel(show) {
+  if (show === undefined) show = !$('panel').classList.contains('show');
+  $('panel').classList.toggle('show', show);
+  if (show) { pickVoice(); renderLangRow(); refreshKeyBox(); hideOffer(); }
+}
+$('btnMute').onclick = () => openPanel();     // “声音”按钮：打开声音和语言选择
+$('btnSet').onclick = () => openPanel();
+$('muteToggle').onclick = () => setTTS(!app.ttsOn);
 setInterval(() => { if ($('panel').classList.contains('show')) updateDiag(); }, 1000);
 $('closePanel').onclick = () => $('panel').classList.remove('show');
 const fmtAdj = n => (n > 0 ? '+' : '') + n;
@@ -1177,7 +1348,7 @@ $('rateR').oninput = e => { app.rateAdj = +e.target.value; applyAdj(); $('rateV'
 document.querySelectorAll('#presets button').forEach(btn => btn.onclick = () => {
   const [p, r] = btn.dataset.p.split(',').map(Number);
   app.pitchAdj = p; app.rateAdj = r; applyAdj(); saveSettings(); syncSliders();
-  sayTest(SAMPLE_LINE);
+  sayTest(sampleForGroup(avGroup(activeVoice())));
 });
 function syncSliders() {
   $('pitchR').value = app.pitchAdj; $('rateR').value = app.rateAdj; $('pitchV').textContent = fmtAdj(app.pitchAdj); $('rateV').textContent = fmtAdj(app.rateAdj);
@@ -1283,7 +1454,7 @@ function startAll() {
   app.started = true; app.micWanted = true; unlockTTS();
   if (!app.recog) app.recog = initRecognition();
   app.busy = true;
-  speak(pick(GREET_LINES), { now: true }).then(() => {
+  speak(pick(L('greet')), { now: true }).then(() => {
     app.busy = false; setState('idle'); scheduleHideBubble(3000);
     afterBusy(400);
   });
@@ -1310,6 +1481,7 @@ window.gokuDebug = {
   fly: () => playMove('fly'), jump: () => playMove('jump'),
   moveAt: (cls, ms) => { const a = playMove(cls); if (a) { a.pause(); a.currentTime = ms; } return a; },  // 截图用：停在动作的第 ms 毫秒
   say: (t) => { app.ttsOn = false; speak(t); },
+  setLang: (k) => setLang(k, null), openPanel: () => openPanel(true),
   talkLoop: () => { setState('talking'); startMouth(); }
 };
 if (DEBUG_STATE) {
